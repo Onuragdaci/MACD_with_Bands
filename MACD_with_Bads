@@ -1,0 +1,58 @@
+//@version=5
+indicator("MACD Signals With Band [Onragdaci]", overlay=false)
+fast = input.int(12, title="Fast EMA Period")
+slow = input.int(26, title="Slow EMA Period")
+osb = input.float(0.825, title="Overbought/Sold Band Multiplier")
+lookback = input.int(500, title="Lookback Period")
+src=close
+fastMA = ta.ema(src, fast)
+slowMA = ta.ema(src, slow)
+
+// Function to calculate MACD
+macdCalculation(src,fast, slow) =>
+    [macdLine, signalLine, _] = ta.macd(src,fast, slow,12)
+    [macdLine, signalLine]
+
+// Function to calculate Fast_min and Fast_max with lookback
+calculateFastBands(macdLine, slow, osb, lookback) =>
+    fastMin = ta.lowest(nz(macdLine[1]),lookback)*osb // Use nz() to handle the case where macdLine[1] is not defined
+    fastMax = ta.highest(nz(macdLine[1]),lookback)*osb // Use nz() to handle the case where macdLine[1] is not defined
+    [fastMin, fastMax]
+
+// Input parameters
+
+// Calculate MACD
+[macdLine, signalLine] = macdCalculation(src,fast, slow)
+
+// Calculate Fast_min and Fast_max
+[fastMin, fastMax] = calculateFastBands(macdLine, slow, osb, lookback)
+
+// Calculate median band
+median_band = (fastMax + fastMin) / 2
+
+// Calculate Bollinger Bands for slow EMA
+[bb_upper, bb_middle, bb_lower] = ta.bb(signalLine, 20, 2)
+
+// Entry and Exit conditions
+entry = (macdLine > signalLine) and (macdLine[1] < signalLine[1]) and (macdLine < fastMin)
+exit = (macdLine < signalLine) and (macdLine[1] > signalLine[1]) and (macdLine > fastMax)
+
+// Plot signals on the chart
+plot(macdLine, color=color.blue, title="MACD")
+plot(signalLine, color=color.red, title="Signal Line")
+plot(fastMin, color=color.green, title="Fast EMA")
+plot(fastMax, color=color.orange, title="Slow EMA")
+plot(median_band, color=color.gray, title="Median Band")
+
+// Plot Bollinger Bands for slow EMA and fill between them
+p1 = plot(bb_upper, color=color.silver,title="Bollinger Bands Upper Line")
+p2 = plot(bb_lower, color=color.silver,title="Bollinger Bands Lower Line")
+fill(p1, p2, color=color.new(color.silver, 90))
+
+// Plot buy and sell signals on the main chart
+plotshape(entry ? low : na, style=shape.triangleup, color=color.green, size=size.small, location=location.bottom, title="Buy Signal")
+plotshape(exit ? high : na, style=shape.triangledown, color=color.red, size=size.small, location=location.bottom, title="Sell Signal")
+
+// Calculate and plot histogram for MACD
+histogram_color = macdLine > signalLine ? color.green : color.red
+plot(macdLine - signalLine, style=plot.style_histogram, color=histogram_color, title="Histogram")
